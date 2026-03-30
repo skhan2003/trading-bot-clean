@@ -1,56 +1,70 @@
 import requests
 import time
+import os
+from flask import Flask
+import threading
 
-# 🔑 YOUR DETAILS (already filled from your bot)
-TOKEN = "8522684488:AAGBLIhapSR42j6HAWAcNHI-i"
+# 🔑 USE ENV VARIABLE (safer)
+TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 CHAT_ID = "7216850185"
 
-# 📊 Stocks to track
 stocks = ["NIO", "SOFI", "LCID", "RIVN", "PLTR"]
 
-# 🧠 Store last prices
 last_prices = {}
 
 def send(msg):
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
     try:
         requests.post(url, data={"chat_id": CHAT_ID, "text": msg})
-    except:
-        pass
+        print("Sent:", msg)
+    except Exception as e:
+        print("Send error:", e)
 
 def get_price(symbol):
     try:
         url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
         res = requests.get(url, timeout=10)
         data = res.json()
-
         return round(data["chart"]["result"][0]["meta"]["regularMarketPrice"], 2)
-
-    except:
+    except Exception as e:
+        print(f"{symbol} error:", e)
         return None
 
+def scanner():
+    send("🚀 BOT STARTED (LIVE SCANNER)")
+    
+    while True:
+        print("Scanning market...")
 
-# 🚀 START MESSAGE
-send("🚀 PRO SCANNER STARTED")
+        for s in stocks:
+            price = get_price(s)
 
-while True:
-    print("Scanning market...")
+            if price:
+                if s not in last_prices:
+                    last_prices[s] = price
 
-    for s in stocks:
-        price = get_price(s)
+                change = abs(price - last_prices[s])
 
-        if price:
-            if s not in last_prices:
-                last_prices[s] = price
+                # 🔥 Slightly more sensitive (better alerts)
+                if change > 0.15:
+                    send(f"🚀 {s} moved: ${last_prices[s]} → ${price}")
+                    last_prices[s] = price
+            else:
+                print(f"{s} skipped")
 
-            change = abs(price - last_prices[s])
+        time.sleep(60)
 
-            # 🔥 ONLY SEND ALERT IF MOVE > $0.2
-            if change > 0.2:
-                send(f"🚀 {s} moved: ${last_prices[s]} → ${price}")
-                last_prices[s] = price
+# 🌐 Flask server (REQUIRED for free Render)
+app = Flask(__name__)
 
-        else:
-            print(f"{s} API issue (skipped)")
+@app.route('/')
+def home():
+    return "Bot is running"
 
-    time.sleep(60)
+def run():
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host='0.0.0.0', port=port)
+
+# 🚀 Run both
+threading.Thread(target=scanner).start()
+run()
