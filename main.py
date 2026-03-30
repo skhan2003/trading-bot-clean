@@ -1,33 +1,47 @@
 import requests
 import time
 
-TOKEN = "8522684488:AAGBLIhapSR42j6HAWAcNHl-ipqJN8eU828"
-CHAT_ID = "7216850185"
+TOKEN = "YOUR_TOKEN"
+CHAT_ID = "YOUR_CHAT_ID"
 
-def send_message(text):
+def send(msg):
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-    requests.post(url, data={"chat_id": CHAT_ID, "text": text})
-
-# STATIC WATCHLIST (reliable)
-stocks = ["NIO", "SOFI", "LCID", "RIVN", "PLTR", "F"]
+    requests.post(url, data={"chat_id": CHAT_ID, "text": msg})
 
 def get_price(symbol):
     try:
         url = f"https://query1.finance.yahoo.com/v7/finance/quote?symbols={symbol}"
-        headers = {"User-Agent": "Mozilla/5.0"}
-        res = requests.get(url, headers=headers).json()
+        res = requests.get(url)
 
-        return res["quoteResponse"]["result"][0]["regularMarketPrice"]
-    except:
+        if res.status_code != 200:
+            return None
+
+        data = res.json()
+
+        if "quoteResponse" not in data:
+            return None
+
+        result = data["quoteResponse"].get("result", [])
+
+        if len(result) == 0:
+            return None
+
+        return result[0].get("regularMarketPrice")
+
+    except Exception as e:
         return None
 
+stocks = ["NIO", "SOFI", "LCID"]
+
 while True:
-    send_message("📡 Scanning market...")
+    send("📡 Scanning market...")
 
-    for stock in stocks:
-        price = get_price(stock)
+    for s in stocks:
+        price = get_price(s)
 
-        if price and price < 5:
-            send_message(f"🚀 {stock} | ${price}")
+        if price:
+            send(f"🚀 {s}: ${price}")
+        else:
+            send(f"⚠️ {s}: data error")
 
-    time.sleep(300)
+    time.sleep(120)
