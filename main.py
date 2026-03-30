@@ -8,16 +8,32 @@ def send_message(text):
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
     requests.post(url, data={"chat_id": CHAT_ID, "text": text})
 
+def get_gainers():
+    url = "https://query1.finance.yahoo.com/v7/finance/quote?symbols=AAPL,TSLA,AMD,NIO,PLTR,SOFI,F,LCID,RIVN"
+
+    headers = {
+        "User-Agent": "Mozilla/5.0"
+    }
+
+    response = requests.get(url, headers=headers)
+
+    if response.status_code != 200:
+        return []
+
+    try:
+        data = response.json()
+        return data["quoteResponse"]["result"]
+    except:
+        return []
+
 while True:
     send_message("📡 Scanning market...")
 
-    try:
-        # FREE WORKING API
-        url = "https://query1.finance.yahoo.com/v7/finance/screener/predefined/saved?count=10&scrIds=day_gainers"
-        data = requests.get(url).json()
+    stocks = get_gainers()
 
-        stocks = data["finance"]["result"][0]["quotes"]
-
+    if not stocks:
+        send_message("⚠️ Data fetch failed, retrying...")
+    else:
         for stock in stocks:
             price = stock.get("regularMarketPrice", 0)
 
@@ -25,8 +41,5 @@ while True:
                 send_message(
                     f"🚀 {stock['symbol']} | ${price}"
                 )
-
-    except Exception as e:
-        send_message(f"Error: {e}")
 
     time.sleep(300)
