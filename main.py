@@ -8,38 +8,26 @@ def send_message(text):
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
     requests.post(url, data={"chat_id": CHAT_ID, "text": text})
 
-def get_gainers():
-    url = "https://query1.finance.yahoo.com/v7/finance/quote?symbols=AAPL,TSLA,AMD,NIO,PLTR,SOFI,F,LCID,RIVN"
+# STATIC WATCHLIST (reliable)
+stocks = ["NIO", "SOFI", "LCID", "RIVN", "PLTR", "F"]
 
-    headers = {
-        "User-Agent": "Mozilla/5.0"
-    }
-
-    response = requests.get(url, headers=headers)
-
-    if response.status_code != 200:
-        return []
-
+def get_price(symbol):
     try:
-        data = response.json()
-        return data["quoteResponse"]["result"]
+        url = f"https://query1.finance.yahoo.com/v7/finance/quote?symbols={symbol}"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        res = requests.get(url, headers=headers).json()
+
+        return res["quoteResponse"]["result"][0]["regularMarketPrice"]
     except:
-        return []
+        return None
 
 while True:
     send_message("📡 Scanning market...")
 
-    stocks = get_gainers()
+    for stock in stocks:
+        price = get_price(stock)
 
-    if not stocks:
-        send_message("⚠️ Data fetch failed, retrying...")
-    else:
-        for stock in stocks:
-            price = stock.get("regularMarketPrice", 0)
-
-            if price and price < 5:
-                send_message(
-                    f"🚀 {stock['symbol']} | ${price}"
-                )
+        if price and price < 5:
+            send_message(f"🚀 {stock} | ${price}")
 
     time.sleep(300)
