@@ -1,9 +1,17 @@
 import requests
 import time
 from datetime import datetime
+from flask import Flask
+import threading
 
 WEBHOOK_URL = "https://discord.com/api/webhooks/1487535942536396810/VQ-wp-Nr4kkUr8w6hShPBYAQp-3_2zrI6C6-yN6Oi-3DY3Vb6zcTRwxz_ooGdG64qmRc"
 API_KEY = "wg6hAv7crwZdlFQcmoYwKdYqnK0cXaXD"
+
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "Bot is running"
 
 def get_gappers():
     url = f"https://financialmodelingprep.com/api/v3/stock_market/gainers?apikey={API_KEY}"
@@ -38,11 +46,11 @@ Volume: {stock['volume']}
 """
     requests.post(WEBHOOK_URL, json={"content": message})
 
-def run():
+def bot_loop():
     while True:
         now = datetime.now()
 
-        if now.hour == 14 and now.minute == 20:
+        if True:  # keep this for testing
             gappers = get_gappers()
             for stock in gappers:
                 send_alert(stock)
@@ -50,4 +58,9 @@ def run():
 
         time.sleep(10)
 
-run()
+# Run bot in background
+threading.Thread(target=bot_loop).start()
+
+# Run web server (needed for Render)
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=10000)
