@@ -1,70 +1,53 @@
 import requests
 import time
-import os
-from flask import Flask
-import threading
+from datetime import datetime
 
-# 🔑 USE ENV VARIABLE (safer)
-TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-CHAT_ID = "7216850185"
+WEBHOOK_URL = "https://discord.com/api/webhooks/1487535942536396810/VQ-wp-Nr4kkUr8w6hShPBYAQp-3_2zrI6C6-yN6Oi-3DY3Vb6zcTRwxz_ooGdG64qmRc"
+API_KEY = "wg6hAv7crwZdlFQcmoYwKdYqnK0cXaXD"
 
-stocks = ["NIO", "SOFI", "LCID", "RIVN", "PLTR"]
+def get_gappers():
+    url = f"https://financialmodelingprep.com/api/v3/stock_market/gainers?apikey={API_KEY}"
+    data = requests.get(url).json()
 
-last_prices = {}
+    results = []
+    for stock in data:
+        try:
+            price = float(stock["price"])
+            change = float(stock["changesPercentage"].replace('%',''))
+            volume = int(stock["volume"])
 
-def send(msg):
-    url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-    try:
-        requests.post(url, data={"chat_id": CHAT_ID, "text": msg})
-        print("Sent:", msg)
-    except Exception as e:
-        print("Send error:", e)
+            if 1 <= price <= 50 and change >= 20 and volume >= 500000:
+                results.append(stock)
+        except:
+            continue
 
-def get_price(symbol):
-    try:
-        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
-        res = requests.get(url, timeout=10)
-        data = res.json()
-        return round(data["chart"]["result"][0]["meta"]["regularMarketPrice"], 2)
-    except Exception as e:
-        print(f"{symbol} error:", e)
-        return None
+    return results[:3]
 
-def scanner():
-    send("🚀 BOT STARTED (LIVE SCANNER)")
-    
-    while True:
-        print("Scanning market...")
+def send_alert(stock):
+    message = f"""
+🚀 GAPPER ALERT
 
-        for s in stocks:
-            price = get_price(s)
+Ticker: {stock['symbol']}
+Price: ${stock['price']}
+Change: {stock['changesPercentage']}
+Volume: {stock['volume']}
 
-            if price:
-                if s not in last_prices:
-                    last_prices[s] = price
-
-                change = abs(price - last_prices[s])
-
-                # 🔥 Slightly more sensitive (better alerts)
-                if change > 0.15:
-                    send(f"🚀 {s} moved: ${last_prices[s]} → ${price}")
-                    last_prices[s] = price
-            else:
-                print(f"{s} skipped")
-
-        time.sleep(60)
-
-# 🌐 Flask server (REQUIRED for free Render)
-app = Flask(__name__)
-
-@app.route('/')
-def home():
-    return "Bot is running"
+🔥 Entry: Break resistance
+🛑 Stop: -5%
+🎯 Target: +10–20%
+"""
+    requests.post(WEBHOOK_URL, json={"content": message})
 
 def run():
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host='0.0.0.0', port=port)
+    while True:
+        now = datetime.now()
 
-# 🚀 Run both
-threading.Thread(target=scanner).start()
+        if now.hour == 14 and now.minute == 20:
+            gappers = get_gappers()
+            for stock in gappers:
+                send_alert(stock)
+            time.sleep(60)
+
+        time.sleep(10)
+
 run()
