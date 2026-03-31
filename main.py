@@ -2,7 +2,6 @@ import requests
 from flask import Flask
 import threading
 import time
-from datetime import datetime
 
 WEBHOOK_URL = "https://discord.com/api/webhooks/1487535942536396810/VQ-wp-Nr4kkUr8w6hShPBYAQp-3_2zrI6C6-yN6Oi-3DY3Vb6zcTRwxz_ooGdG64qmRc"
 API_KEY = "wg6hAv7crwZdlFQcmoYwKdYqnK0cXaXD"
@@ -11,52 +10,87 @@ app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return "Bot is running"
+    return "ADVANCED BOT RUNNING"
 
-def get_gappers():
+def get_stocks():
     url = f"https://financialmodelingprep.com/api/v3/stock_market/gainers?apikey={API_KEY}"
     data = requests.get(url).json()
 
-    results = []
+    strong = []
+
     for stock in data:
         try:
             price = float(stock["price"])
             change = float(stock["changesPercentage"].replace('%',''))
             volume = int(stock["volume"])
+            avg_volume = int(stock.get("avgVolume", volume))
 
-            if 1 <= price <= 50 and change >= 20 and volume >= 500000:
-                results.append(stock)
+            if avg_volume == 0:
+                continue
+
+            volume_ratio = volume / avg_volume
+
+            if (
+                1 <= price <= 50 and
+                change >= 20 and
+                volume >= 500000 and
+                volume_ratio >= 2
+            ):
+                trade_type = "BREAKOUT 🚀" if change > 35 else "PULLBACK 🛡️"
+
+                strong.append({
+                    "symbol": stock["symbol"],
+                    "price": price,
+                    "change": change,
+                    "volume": volume,
+                    "ratio": round(volume_ratio, 2),
+                    "type": trade_type
+                })
+
         except:
             continue
 
-    return results[:3]
+    return strong[:5]
 
 def send_alert(stock):
+    entry = round(stock["price"] * 1.02, 2)
+    stop = round(stock["price"] * 0.95, 2)
+    target = round(stock["price"] * 1.18, 2)
+
     message = f"""
-🚀 GAPPER ALERT
+🚀 **ADVANCED SIGNAL**
 
 Ticker: {stock['symbol']}
-Price: ${stock['price']}
-Change: {stock['changesPercentage']}
-Volume: {stock['volume']}
+Type: {stock['type']}
 
-🔥 Entry: Break resistance
-🛑 Stop: -5%
-🎯 Target: +10–20%
+Price: ${stock['price']}
+Change: +{stock['change']}%
+Volume: {stock['volume']} (x{stock['ratio']})
+
+🎯 Entry: ${entry}
+🛑 Stop: ${stop}
+💰 Target: ${target}
 """
+
     requests.post(WEBHOOK_URL, json={"content": message})
 
 def bot_loop():
+    sent = set()
+
     while True:
-        now = datetime.now()
+        try:
+            stocks = get_stocks()
 
-        if now.hour == 14 and now.minute == 20:
-            gappers = get_gappers()
-            for stock in gappers:
-                send_alert(stock)
+            for stock in stocks:
+                if stock["symbol"] not in sent:
+                    send_alert(stock)
+                    sent.add(stock["symbol"])
+
+            time.sleep(120)  # every 2 minutes
+
+        except Exception as e:
+            print("Error:", e)
             time.sleep(60)
-
-        time.sleep(10)
 
 threading.Thread(target=bot_loop).start()
 
